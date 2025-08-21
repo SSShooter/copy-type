@@ -16,20 +16,33 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "copy-type.copyTypeAtCursor",
-        "title": "Copy Type at Cursor"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "copy-type.copyTypeAtCursor",
-        "key": "ctrl+shift+c",
-        "mac": "cmd+shift+c",
-        "when": "editorTextFocus && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == vue)"
-      }
-    ]
+		"commands": [
+			{
+				"command": "copy-type.copyVariableType",
+				"title": "复制变量类型"
+			},
+			{
+				"command": "copy-type.copyTypeAtCursor",
+				"title": "复制光标处类型"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "copy-type.copyTypeAtCursor",
+				"key": "ctrl+alt+c",
+				"mac": "cmd+alt+c",
+				"when": "editorTextFocus && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == javascript || editorLangId == javascriptreact)"
+			}
+		],
+		"menus": {
+			"editor/context": [
+				{
+					"command": "copy-type.copyVariableType",
+					"when": "editorTextFocus && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == javascript || editorLangId == javascriptreact)",
+					"group": "navigation"
+				}
+			]
+		}
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",

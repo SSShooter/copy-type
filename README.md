@@ -1,71 +1,53 @@
-# copy-type README
+# Copy-Type 插件
 
-This is the README for your extension "copy-type". After writing up a brief description, we recommend including the following sections.
+Copy-Type 是一个 VS Code 插件，用于快速复制 TypeScript/JavaScript 变量、函数或对象的类型定义。当你需要重用某个复杂类型或接口时，这个插件可以帮助你快速获取类型信息，无需手动查找和复制。
 
-## Features
+## 功能特性
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **悬停显示类型**：将鼠标悬停在变量、函数或对象上，显示其类型定义
+- **快捷键复制类型**：使用 `Ctrl+Alt+C`（Mac 上为 `Cmd+Alt+C`）快速复制当前光标位置的类型
+- **右键菜单复制**：在编辑器中右键点击，从修改菜单组中选择"Copy Type at Cursor"复制类型
+- **支持多种文件格式**：支持 `.ts`、`.tsx` 和 `.vue` 文件中的 TypeScript 类型
 
-For example if there is an image subfolder under your extension project workspace:
+## 使用方法
 
-\!\[feature X\]\(images/feature-x.png\)
+1. **悬停查看类型**：
+   - 将鼠标悬停在任何 TypeScript 变量、函数或对象上
+   - 查看显示的类型信息
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+2. **使用快捷键复制类型**：
+   - 将光标放在需要获取类型的变量、函数或对象上
+   - 按下 `Ctrl+Alt+C`（Mac 上为 `Cmd+Alt+C`）
+   - 类型信息将被复制到剪贴板
 
-## Requirements
+3. **使用右键菜单复制类型**：
+   - 右键点击需要获取类型的变量、函数或对象
+   - 在右键菜单的"修改"组中选择 "Copy Type at Cursor"
+   - 类型信息将被复制到剪贴板
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## 支持的文件类型
 
-## Extension Settings
+- TypeScript (`.ts`)
+- TypeScript React (`.tsx`)
+- Vue (`.vue`) 文件中的 TypeScript 代码
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## 已知问题
 
-For example:
+- 对于非常复杂的嵌套类型，提取可能不完整
+- 在某些情况下，可能无法正确识别泛型类型参数
+- Vue 文件中的类型提取依赖于 Volar/Vetur 插件的支持
 
-This extension contributes the following settings:
+## 版本历史
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+### 0.0.1
 
-## Known Issues
+- 初始版本
+- 支持通过悬停查看类型信息
+- 支持通过快捷键复制类型
+- 支持通过右键菜单复制类型
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+## 贡献
 
-## Release Notes
+欢迎提交问题报告和功能请求到项目的 GitHub 仓库。
 
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+**祝您使用愉快!**
