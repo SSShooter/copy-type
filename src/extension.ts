@@ -3,34 +3,38 @@ import * as ts from 'typescript';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// TypeScript 语言服务实例
+// TypeScript language service instance
 let languageService: ts.LanguageService | null = null;
 let program: ts.Program | null = null;
 let typeChecker: ts.TypeChecker | null = null;
 
-// 文件缓存
+// File cache and service state
 const fileCache = new Map<string, string>();
+const fileVersions = new Map<string, number>();
+let isServiceInitialized = false;
+let currentWorkspaceRoot: string | null = null;
+let serviceHost: ts.LanguageServiceHost | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('copy-type extension activated');
 
-    // 注册右键菜单命令
-    const copyTypeCommand = vscode.commands.registerCommand('copy-type.copyVariableType', async () => {
+    // Register right-click menu command
+    const copyTypeCommand = vscode.commands.registerCommand('copy-type.copyTypeAtCursor', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
-            vscode.window.showErrorMessage('没有活动的编辑器');
+            vscode.window.showErrorMessage('No active editor');
             return;
         }
 
         const document = editor.document;
         const selection = editor.selection;
         
-        // 获取选中的文本或光标位置的单词
+        // Get selected text or word at cursor position
         let selectedText = document.getText(selection);
         let position = selection.active;
-        
+
         if (!selectedText) {
-            // 如果没有选中文本，尝试获取光标位置的单词
+            // If no text is selected, try to get the word at cursor position
             const wordRange = document.getWordRangeAtPosition(position);
             if (wordRange) {
                 selectedText = document.getText(wordRange);
@@ -39,91 +43,174 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         if (!selectedText) {
-            vscode.window.showWarningMessage('请选择一个变量或将光标放在变量上');
+            vscode.window.showWarningMessage('Please select a variable or place cursor on a variable');
             return;
         }
 
         try {
-            const typeInfo = await getVariableType(document, position, selectedText);
-            if (typeInfo) {
-                await vscode.env.clipboard.writeText(typeInfo);
-                vscode.window.showInformationMessage(`类型已复制: ${typeInfo}`);
-            } else {
-                vscode.window.showWarningMessage(`无法获取变量 "${selectedText}" 的类型信息`);
-            }
+            // Show loading progress
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Getting type information...",
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ increment: 0, message: "Analyzing code..." });
+
+                const typeInfo = await getVariableType(document, position, selectedText, progress);
+
+                progress.report({ increment: 100, message: "Complete" });
+
+                if (typeInfo) {
+                    await vscode.env.clipboard.writeText(typeInfo);
+                    vscode.window.showInformationMessage(`Type copied: ${typeInfo}`);
+                } else {
+                    vscode.window.showWarningMessage(`Unable to get type information for variable "${selectedText}"`);
+                }
+            });
         } catch (error) {
-            console.error('获取类型信息失败:', error);
-            vscode.window.showErrorMessage('获取类型信息失败');
+            console.error('Failed to get type information:', error);
+            vscode.window.showErrorMessage('Failed to get type information');
         }
     });
 
-    // 注册快捷键命令
-    const copyTypeShortcut = vscode.commands.registerCommand('copy-type.copyTypeAtCursor', async () => {
-        vscode.commands.executeCommand('copy-type.copyVariableType');
-    });
-
-    context.subscriptions.push(copyTypeCommand, copyTypeShortcut);
+    context.subscriptions.push(copyTypeCommand);
 }
 
-// 获取变量类型
-async function getVariableType(document: vscode.TextDocument, position: vscode.Position, variableName: string): Promise<string | null> {
+// Get variable type
+async function getVariableType(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    variableName: string,
+    progress?: vscode.Progress<{ message?: string; increment?: number }>
+): Promise<string | null> {
     try {
-        // 初始化 TypeScript 服务
-        await initializeTypeScriptService(document);
-        
+        progress?.report({ increment: 10, message: "Checking workspace..." });
+
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+        if (!workspaceFolder) {
+            return null;
+        }
+
+        const rootPath = workspaceFolder.uri.fsPath;
+
+        // Only reinitialize when workspace changes or service is not initialized
+        if (!isServiceInitialized || currentWorkspaceRoot !== rootPath) {
+            progress?.report({ increment: 20, message: "Initializing TypeScript service..." });
+            await initializeTypeScriptService(rootPath);
+            currentWorkspaceRoot = rootPath;
+            isServiceInitialized = true;
+            progress?.report({ increment: 60, message: "Service initialization complete" });
+        } else {
+            progress?.report({ increment: 50, message: "Using cached service" });
+        }
+
         if (!languageService || !typeChecker) {
             return null;
         }
 
+        progress?.report({ increment: 70, message: "Updating file cache..." });
+
         const fileName = document.uri.fsPath;
+
+        // Update current document content to cache
+        const currentContent = document.getText();
+        const cachedContent = fileCache.get(fileName);
+
+        // Only update version when content changes
+        if (cachedContent !== currentContent) {
+            fileCache.set(fileName, currentContent);
+            const currentVersion = fileVersions.get(fileName) || 1;
+            fileVersions.set(fileName, currentVersion + 1);
+        }
+
+        progress?.report({ increment: 80, message: "Parsing source file..." });
+
+        // Get source file
         const sourceFile = languageService.getProgram()?.getSourceFile(fileName);
-        
         if (!sourceFile) {
             return null;
         }
 
-        // 将 VSCode 位置转换为 TypeScript 位置
+        // Convert VSCode position to TypeScript position
         const offset = document.offsetAt(position);
-        
-        // 查找变量节点
-        const node = findNodeAtPosition(sourceFile, offset);
+
+        progress?.report({ increment: 90, message: "Analyzing type information..." });
+
+        // Find the most specific node
+        const node = findMostSpecificNodeAtPosition(sourceFile, offset);
         if (!node) {
+            console.log('No node found at position:', offset);
             return null;
         }
 
-        // 获取类型信息
+        console.log('Found node:', ts.SyntaxKind[node.kind], 'at position:', offset);
+        console.log('Node text:', node.getText(sourceFile));
+
+        // Get type information
         const type = typeChecker.getTypeAtLocation(node);
         if (!type) {
+            console.log('No type found for node');
             return null;
         }
 
-        // 格式化类型字符串
-        const typeString = typeChecker.typeToString(type, node, ts.TypeFormatFlags.InTypeAlias | ts.TypeFormatFlags.NoTruncation);
-        
+        console.log('Type flags:', type.flags);
+        console.log('Type symbol:', type.symbol?.name);
+
+        // Try different type formatting options
+        let typeString: string;
+
+        // Use flag combination to avoid import() syntax
+        const formatFlags =
+            ts.TypeFormatFlags.InTypeAlias |
+            ts.TypeFormatFlags.NoTruncation |
+            ts.TypeFormatFlags.WriteArrayAsGenericType |
+            ts.TypeFormatFlags.UseStructuralFallback |
+            ts.TypeFormatFlags.WriteTypeArgumentsOfSignature |
+            ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope;
+
+        // For object types, try to get more detailed type information
+        if (type.flags & ts.TypeFlags.Object) {
+            typeString = typeChecker.typeToString(type, node, formatFlags);
+        } else {
+            // For other types, use the same formatting options
+            typeString = typeChecker.typeToString(type, node, formatFlags);
+        }
+
+        console.log('Generated type string:', typeString);
+
+        // If we get 'any', try to infer type from node's context
+        if (typeString === 'any' && node.parent) {
+            console.log('Got any, trying parent context...');
+            const parentType = typeChecker.getTypeAtLocation(node.parent);
+            if (parentType && parentType !== type) {
+                let parentTypeString = typeChecker.typeToString(
+                    parentType,
+                    node.parent,
+                    formatFlags
+                );
+                console.log('Parent type string:', parentTypeString);
+                if (parentTypeString !== 'any') {
+                    typeString = parentTypeString;
+                }
+            }
+        }
+
         return typeString;
     } catch (error) {
-        console.error('获取变量类型失败:', error);
+        console.error('Failed to get variable type:', error);
         return null;
     }
 }
 
-// 初始化 TypeScript 语言服务
-async function initializeTypeScriptService(document: vscode.TextDocument): Promise<void> {
-    const fileName = document.uri.fsPath;
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+// Initialize TypeScript language service
+async function initializeTypeScriptService(rootPath: string): Promise<void> {
     
-    if (!workspaceFolder) {
-        throw new Error('无法找到工作区文件夹');
-    }
-
-    const rootPath = workspaceFolder.uri.fsPath;
-    
-    // 查找 tsconfig.json
+    // Find tsconfig.json
     const tsconfigPath = findTsConfig(rootPath);
     let compilerOptions: ts.CompilerOptions = {
         target: ts.ScriptTarget.ES2020,
         module: ts.ModuleKind.ESNext,
-        moduleResolution: ts.ModuleResolutionKind.NodeJs,
+        moduleResolution: ts.ModuleResolutionKind.Node10,
         allowJs: true,
         checkJs: false,
         jsx: ts.JsxEmit.React,
@@ -135,7 +222,7 @@ async function initializeTypeScriptService(document: vscode.TextDocument): Promi
         forceConsistentCasingInFileNames: true
     };
 
-    // 如果找到 tsconfig.json，读取配置
+    // If tsconfig.json is found, read configuration
     if (tsconfigPath) {
         const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
         if (!configFile.error) {
@@ -148,24 +235,32 @@ async function initializeTypeScriptService(document: vscode.TextDocument): Promi
         }
     }
 
-    // 获取所有 TypeScript/JavaScript 文件
+    // Get all TypeScript/JavaScript files
     const files = await getAllTsFiles(rootPath);
     
-    // 创建语言服务主机
-    const serviceHost: ts.LanguageServiceHost = {
+    // Create language service host
+    serviceHost = {
         getScriptFileNames: () => files,
-        getScriptVersion: (fileName) => '1',
+        getScriptVersion: (fileName) => {
+            const version = fileVersions.get(fileName) || 1;
+            return version.toString();
+        },
         getScriptSnapshot: (fileName) => {
             if (!fs.existsSync(fileName)) {
                 return undefined;
             }
-            
+
             let content = fileCache.get(fileName);
             if (!content) {
-                content = fs.readFileSync(fileName, 'utf8');
-                fileCache.set(fileName, content);
+                try {
+                    content = fs.readFileSync(fileName, 'utf8');
+                    fileCache.set(fileName, content);
+                    fileVersions.set(fileName, 1);
+                } catch (error) {
+                    return undefined;
+                }
             }
-            
+
             return ts.ScriptSnapshot.fromString(content);
         },
         getCurrentDirectory: () => rootPath,
@@ -177,16 +272,13 @@ async function initializeTypeScriptService(document: vscode.TextDocument): Promi
         getDirectories: ts.sys.getDirectories,
     };
 
-    // 创建语言服务
+    // Create language service
     languageService = ts.createLanguageService(serviceHost, ts.createDocumentRegistry());
     program = languageService.getProgram() || null;
     typeChecker = program?.getTypeChecker() || null;
-
-    // 更新当前文档内容
-    fileCache.set(fileName, document.getText());
 }
 
-// 查找 tsconfig.json
+// Find tsconfig.json
 function findTsConfig(rootPath: string): string | null {
     let currentPath = rootPath;
     
@@ -201,53 +293,87 @@ function findTsConfig(rootPath: string): string | null {
     return null;
 }
 
-// 获取所有 TypeScript/JavaScript 文件
+// Get all TypeScript/JavaScript files (optimized version)
 async function getAllTsFiles(rootPath: string): Promise<string[]> {
     const files: string[] = [];
-    
-    const searchFiles = (dir: string) => {
+    const maxDepth = 10; // Limit search depth
+    const maxFiles = 1000; // Limit file count
+
+    const searchFiles = (dir: string, depth: number = 0) => {
+        if (depth > maxDepth || files.length > maxFiles) {
+            return;
+        }
+
         try {
             const entries = fs.readdirSync(dir, { withFileTypes: true });
-            
+
             for (const entry of entries) {
+                if (files.length > maxFiles) {
+                    break;
+                }
+
                 const fullPath = path.join(dir, entry.name);
-                
+
                 if (entry.isDirectory()) {
-                    // 跳过 node_modules 和其他不需要的目录
-                    if (!['node_modules', '.git', 'dist', 'build', '.vscode'].includes(entry.name)) {
-                        searchFiles(fullPath);
+                    // Skip more unnecessary directories to improve performance
+                    const skipDirs = [
+                        'node_modules', '.git', 'dist', 'build', '.vscode',
+                        '.next', '.nuxt', 'coverage', '.nyc_output',
+                        'tmp', 'temp', '.cache', '.parcel-cache'
+                    ];
+                    if (!skipDirs.includes(entry.name) && !entry.name.startsWith('.')) {
+                        searchFiles(fullPath, depth + 1);
                     }
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name);
-                    if (['.ts', '.tsx', '.js', '.jsx', '.vue'].includes(ext)) {
+                    if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) {
                         files.push(fullPath);
                     }
                 }
             }
         } catch (error) {
-            console.error(`读取目录失败: ${dir}`, error);
+            // Silently ignore permission errors, etc.
         }
     };
-    
+
     searchFiles(rootPath);
     return files;
 }
 
-// 在指定位置查找节点
-function findNodeAtPosition(sourceFile: ts.SourceFile, position: number): ts.Node | null {
-    function find(node: ts.Node): ts.Node | null {
-        if (position >= node.getStart() && position < node.getEnd()) {
-            return ts.forEachChild(node, find) || node;
+// Find the most specific node (including identifiers)
+function findMostSpecificNodeAtPosition(sourceFile: ts.SourceFile, position: number): ts.Node | null {
+    let result: ts.Node | null = null;
+    let bestStart = -1;
+    let bestEnd = Infinity;
+
+    function visit(node: ts.Node) {
+        const start = node.getStart(sourceFile);
+        const end = node.getEnd();
+
+        if (position >= start && position < end) {
+            // If this node is more precise than previously found (smaller range), update result
+            if (start > bestStart || (start === bestStart && end < bestEnd)) {
+                result = node;
+                bestStart = start;
+                bestEnd = end;
+            }
+
+            // Continue visiting child nodes
+            ts.forEachChild(node, visit);
         }
-        return null;
     }
-    
-    return find(sourceFile);
+
+    visit(sourceFile);
+    return result;
 }
 
 export function deactivate() {
     languageService = null;
     program = null;
     typeChecker = null;
+    serviceHost = null;
     fileCache.clear();
+    fileVersions.clear();
+    isServiceInitialized = false;
+    currentWorkspaceRoot = null;
 }

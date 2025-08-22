@@ -1,53 +1,63 @@
-# Copy-Type 插件
+# Copy-Type Extension
 
-Copy-Type 是一个 VS Code 插件，用于快速复制 TypeScript/JavaScript 变量、函数或对象的类型定义。当你需要重用某个复杂类型或接口时，这个插件可以帮助你快速获取类型信息，无需手动查找和复制。
+Copy-Type is a VS Code extension for quickly copying TypeScript/JavaScript variable, function, or object type definitions. When you need to reuse a complex type or interface, this extension helps you quickly get the type information without manually searching and copying.
 
-## 功能特性
+## Features
 
-- **悬停显示类型**：将鼠标悬停在变量、函数或对象上，显示其类型定义
-- **快捷键复制类型**：使用 `Ctrl+Alt+C`（Mac 上为 `Cmd+Alt+C`）快速复制当前光标位置的类型
-- **右键菜单复制**：在编辑器中右键点击，从修改菜单组中选择"Copy Type at Cursor"复制类型
-- **支持多种文件格式**：支持 `.ts`、`.tsx` 和 `.vue` 文件中的 TypeScript 类型
+- **Copy type at cursor**: Use keyboard shortcuts to quickly copy the type at the current cursor position
+- **Copy variable type**: Right-click in the editor to copy the type of a selected variable
+- **Support for multiple file formats**: Works with `.ts`, `.tsx`, `.js`, `.jsx`, and `.vue` files
 
-## 使用方法
+## Usage
 
-1. **悬停查看类型**：
-   - 将鼠标悬停在任何 TypeScript 变量、函数或对象上
-   - 查看显示的类型信息
+1. **Copy type at cursor**:
+   - Place your cursor on any TypeScript variable, function, or object
+   - Press `Ctrl+Alt+C` (or `Cmd+Alt+C` on Mac)
+   - The type information will be copied to your clipboard
 
-2. **使用快捷键复制类型**：
-   - 将光标放在需要获取类型的变量、函数或对象上
-   - 按下 `Ctrl+Alt+C`（Mac 上为 `Cmd+Alt+C`）
-   - 类型信息将被复制到剪贴板
+2. **Copy variable type using context menu**:
+   - Right-click on a variable, function, or object
+   - Select "Copy Variable Type" from the context menu
+   - The type information will be copied to your clipboard
 
-3. **使用右键菜单复制类型**：
-   - 右键点击需要获取类型的变量、函数或对象
-   - 在右键菜单的"修改"组中选择 "Copy Type at Cursor"
-   - 类型信息将被复制到剪贴板
+## Setting Up Keyboard Shortcuts
 
-## 支持的文件类型
+This extension does not provide default keyboard shortcuts to avoid conflicts with other extensions. You can easily set up your own custom shortcuts:
+
+1. Open VS Code Keyboard Shortcuts settings by pressing `Ctrl+K Ctrl+S` (`Cmd+K Cmd+S` on Mac)
+2. Search for "copy-type" to find the extension commands:
+   - `Copy Type at Cursor` - copies the type at the current cursor position
+   - `Copy Variable Type` - copies the type of a selected variable
+3. Click on the pencil icon next to a command to assign a keyboard shortcut
+4. Press your desired key combination and save
+
+**Suggested shortcuts:**
+- `Ctrl+Alt+C` (`Cmd+Alt+C` on Mac) for "Copy Type at Cursor"
+- `Ctrl+Alt+V` (`Cmd+Alt+V` on Mac) for "Copy Variable Type"
+
+## Supported File Types
 
 - TypeScript (`.ts`)
 - TypeScript React (`.tsx`)
-- Vue (`.vue`) 文件中的 TypeScript 代码
+- JavaScript (`.js`)
+- JavaScript React (`.jsx`)
+- Vue (`.vue`) files with TypeScript code
 
-## 已知问题
+## Known Issues
 
-- 对于非常复杂的嵌套类型，提取可能不完整
-- 在某些情况下，可能无法正确识别泛型类型参数
-- Vue 文件中的类型提取依赖于 Volar/Vetur 插件的支持
+- For very complex nested types, extraction may be incomplete
+- In some cases, generic type parameters may not be correctly identified
+- Type extraction in Vue files depends on Volar/Vetur plugin support
 
-## 版本历史
+## Version History
 
 ### 0.0.1
 
-- 初始版本
-- 支持通过悬停查看类型信息
-- 支持通过快捷键复制类型
-- 支持通过右键菜单复制类型
+- Initial release
+- Support for copying types using keyboard shortcuts and context menu
 
-## 贡献
+## Contributing
 
-欢迎提交问题报告和功能请求到项目的 GitHub 仓库。
+Feel free to submit issue reports and feature requests to the project's GitHub repository.
 
-**祝您使用愉快!**
+**Enjoy!**

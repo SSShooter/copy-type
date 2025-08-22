@@ -18,12 +18,8 @@
   "contributes": {
 		"commands": [
 			{
-				"command": "copy-type.copyVariableType",
-				"title": "复制变量类型"
-			},
-			{
 				"command": "copy-type.copyTypeAtCursor",
-				"title": "复制光标处类型"
+				"title": "Copy Variable Type"
 			}
 		],
 		"keybindings": [
@@ -37,7 +33,7 @@
 		"menus": {
 			"editor/context": [
 				{
-					"command": "copy-type.copyVariableType",
+					"command": "copy-type.copyTypeAtCursor",
 					"when": "editorTextFocus && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == javascript || editorLangId == javascriptreact)",
 					"group": "navigation"
 				}
